@@ -1,0 +1,51 @@
+#!/usr/bin/perl
+# Execute the special (commented) SourceXX:CMD commands
+# Copyright 2008, 2009, 2010 by Lorenzo Villani.
+# Licensed under the terms of the GNU General Public License version 3
+
+use strict;
+use warnings;
+use Getopt::Long;
+
+our $SOURCEDIR;
+
+GetOptions('C|sourcedir=s' => \$SOURCEDIR);
+
+$SOURCEDIR = `rpm --eval \%{_sourcedir}` if not $SOURCEDIR;
+die('Unable to determine value of %{_sourcedir}') if not $SOURCEDIR;
+chomp($SOURCEDIR);
+
+foreach (@ARGV) {
+    if (-f) {
+        open(SPECFILE, "<$_");
+        my ($name, $version, $release) = undef;
+        my %defcommands;
+
+        while (<SPECFILE>) {
+            $name = $1 if m/^Name:\s+(\S+)/;
+            $version = $1 if m/^Version:\s+(\S+)/;
+            $release = $1 if m/^Release:\s+(\S+)/;
+            if ($_ =~ m/^#\s*Source\d+:CMD\s+(.*)/) {
+                my $line = $1;
+                $line =~ s/%{name}/$name/g;
+                $line =~ s/%{version}/$version/g;
+                $line =~ s/%{release}/$release/g;
+                $line =~ s/%{_sourcedir}/$SOURCEDIR/g;
+
+                foreach my $key (keys %defcommands) {
+                    $line =~ s/%{$key}/$defcommands{$key}/g;
+                }
+
+                print("-> $line\n");
+                system($line);
+            } elsif ($_ =~ m/^#\s*Source\d+:VAR\s+(\w+)\s+(.+)/) {
+                my $key = $1;
+                my $res = `$2`;
+                chomp($res);
+                $defcommands{$key} = $res;
+            }
+        }
+
+        close(SPECFILE);
+    }
+}

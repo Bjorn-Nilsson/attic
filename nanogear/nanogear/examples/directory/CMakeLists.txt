@@ -1,0 +1,2 @@
+add_executable(directory directory.cpp)
+target_link_libraries(directory NCore NInternalConnector)

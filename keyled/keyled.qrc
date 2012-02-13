@@ -1,0 +1,6 @@
+ <!DOCTYPE RCC><RCC version="1.0">
+ <qresource>
+     <file>enabled.png</file>
+     <file>disabled.png</file>
+ </qresource>
+ </RCC>

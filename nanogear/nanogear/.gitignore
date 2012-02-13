@@ -1,0 +1,18 @@
+# Ignore build directories
+build/
+_build/
+
+# Ignore objects
+*.o
+*.so
+*.so.*
+moc_*
+ui_*
+
+# Ignore project files
+*.kdev4
+.kdev4/
+.project
+.pydevproject
+Makefile
+nanogear.pro.user

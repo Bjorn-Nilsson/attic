@@ -1,0 +1,71 @@
+PACKAGE-DEEP-CLEANUP(8)
+=======================
+:doctype: manpage
+
+
+
+NAME
+----
+package-deep-cleanup - Clean up the system using a list of explicitly
+installed packages.
+
+
+
+SYNOPSIS
+--------
+*package-deep-cleanup* ['FILE' ...]
+
+
+
+DESCRIPTION
+-----------
+The package-deep-cleanup(8) command will read a list of required software
+packages from input files and use it to bring the system to a specific state
+by installing missing packages and removing unnecessary ones.
+
+
+
+USE CASES AND MOTIVATION
+------------------------
+Users of various Linux distributions tend to use their favorite package
+management tool to install software on their system. After some time they
+usually end up with lots of software packages installed on their system.
+
+When they want to clean-up their system they usually have three choices:
+
+- Go through the tedious process of trying to remove each package hoping
+  that (due to dependencies) it won't bring down the whole system;
+- Reinstall the system from scratch;
+- Hope that their package management tool is able to track explicitly
+  installed packages and thus remove all unnecessary packages whenever the
+  user uninstalls a package.
+
+Some tools (i.e.: aptitude and emerge) come with the third option
+out-of-the-box.
+
+Yum, however, is not (yet) capable of tracking explicit installations. It
+provides a couple of tools (i.e.: remove-leaves plug-in and package-cleanup
+tool) but they must be used from the beginning (remove-leaves plug-in) or they
+are often inaccurate (package-cleanup).
+
+
+
+EXIT STATUS
+-----------
+*0*::
+        No errors
+
+*1*::
+        Failure
+
+
+
+BUGS
+----
+https://github.com/lvillani/yum-utils-extra/issues
+
+
+
+AUTHOR
+------
+Lorenzo Villani <lorenzo@villani.name>

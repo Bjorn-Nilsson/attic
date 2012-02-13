@@ -1,0 +1,211 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# Copyright (C) 2009, 2010 Lorenzo Villani.
+# Licensed under the terms of the GNU General Public License version 3
+#
+# Q: "Do you like python?"
+# A: "42"
+#
+import sys
+import re
+import os
+import os.path
+import shutil
+
+from subprocess import Popen, PIPE
+from optparse import OptionParser
+from ConfigParser import SafeConfigParser
+
+
+
+def createrepo(path):
+    print 'Generating repository...'
+    process = Popen(' '.join(['createrepo', '--deltas', '-d', '-x', 'debug/*', path, '-o', path]), stdout=PIPE, shell=True)
+    process.wait()
+
+
+
+def manage_repo(repo_path, srpm_dir=False):
+    print 'Repository: %s' % repo_path
+    if not srpm_dir:
+        debuginfo_path = os.path.join(repo_path, 'debug')
+        for filename in os.listdir(repo_path):
+            if filename.endswith('.src.rpm'):
+                os.unlink(os.path.join(repo_path, filename))
+            elif filename.find('-debuginfo-') != -1:
+                shutil.move(os.path.join(repo_path, filename), debuginfo_path)
+            
+        for directory in [repo_path, debuginfo_path]:
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+            createrepo(directory)
+    else:
+        createrepo(repo_path)
+
+
+
+def download_sources(pkgpath, specfile):
+    process = Popen(' '.join(['spectool', '-C', pkgpath, '-gf', specfile]), shell=True)
+    process.wait()
+
+
+
+def create_srpm(pkgpath, specfile, old=False):
+    print 'Creating source rpm...'
+    cmd_list = ['rpmbuild']
+    for var in ['_sourcedir', '_specdir', '_builddir', '_srcrpmdir', '_rpmdir']:
+        cmd_list.append(' '.join(['--define', '"' + var, pkgpath + '"']))
+
+    if old is True:
+        cmd_list.append('--define "_source_filedigest_algorithm 0"')
+        cmd_list.append('--define "_binary_filedigest_algorithm 0"')
+
+    cmd_list.extend(['--nodeps', '-bs', specfile])
+
+    output = Popen(' '.join(cmd_list), stdout=PIPE, shell=True).communicate()[0]
+    match = re.match(r'Wrote:\s+(.*)', output)
+    if match is not None:
+        return match.group(1)
+    else:
+        return None
+
+
+
+def mock_generate_profile(configdir, profile, destdir):
+    print 'Generating profile'
+    outputFile = os.path.join('/tmp', profile + '.cfg')
+
+    f = open(os.path.join(configdir, profile + '.cfg'), 'r')
+    o = open(outputFile, 'w')
+
+    for sf in ['logging.ini', 'site-defaults.cfg']:
+        if not os.path.exists(os.path.join('/tmp', sf)):
+            print 'Symlinking %s' % os.path.join(configdir, sf)
+            os.symlink(os.path.join(configdir, sf), os.path.join('/tmp', sf))
+
+    for line in f:
+        if line.startswith('"""'):
+            o.write("")
+            o.write("[local_repository]\n")
+            o.write("name=local_repository\n")
+            o.write("baseurl=file://"+destdir+"\n")
+            o.write("enabled=1\n")
+            o.write('"""')
+        else:
+            o.write(line)
+
+    f.close()
+    o.close()
+
+
+
+def mock_build(configdir, destdir, profile, pkgname, srcrpm):
+    if not os.path.exists(os.path.join(destdir, 'logs', pkgname)):
+        print 'Creating log directory'
+        os.makedirs(os.path.join(destdir, 'logs', pkgname))
+
+    print 'Setting up logs...'
+    for log_name in ['root.log', 'state.log', 'build.log']:
+        # 'Touch' the log file
+        open(os.path.join(destdir, 'logs', pkgname, log_name), 'w').close()
+
+        # Drop old symlink, if any
+        if os.path.exists(os.path.join(destdir, log_name)):
+            os.unlink(os.path.join(destdir, log_name))
+        # And create the new one
+        os.symlink(os.path.join(destdir, 'logs', pkgname, log_name), os.path.join(destdir, log_name))
+        print '    %s: %s' % (log_name,  os.path.join(destdir, 'logs', pkgname, log_name))
+
+    # Initialize the main repository if it's not ready yet to prevent errors
+    if not os.path.exists(os.path.join(destdir, 'repodata')):
+        print 'Initializing repository...'
+        manage_repo(destdir)
+
+    mock_generate_profile(configdir, profile, destdir)
+    print 'Running mock...\n    Profile: %s\n    Profile directory: %s\n    SRPM: %s' % (profile, configdir, srcrpm)
+    mock = Popen(' '.join(['mock', '--configdir=/tmp', '--resultdir='+destdir, '-r', profile, 'rebuild', srcrpm]), stderr=PIPE, shell=True)
+    mock.wait()
+
+    if mock.returncode == 0:
+        return True
+    else:
+        return False
+
+
+
+if __name__ == "__main__":
+    # Command line arguments
+    usage = "usage: %prog [options] pkg"
+    parser = OptionParser(usage)
+    parser.add_option("-r", "--repository", dest="repository", help="Repository name", action="store")
+    parser.add_option("-f", "--freshen", dest="freshen", action="store_true")
+    parser.add_option("-d", "--download", dest="download", action="store_true")
+    parser.add_option("-o", "--old-rpm", dest="old_rpm", action="store_true")
+    (options, args) = parser.parse_args()
+
+    # Configuration file
+    config = SafeConfigParser()
+    config.read(os.path.expanduser("~/.pmkrc"))
+    specfiles_dir = config.get('specfiles', 'directory')
+
+    if not options.repository:
+        print "Please specify a target repository"
+        sys.exit(1)
+
+    # Sanity check
+    if not os.path.exists(specfiles_dir):
+        print "Couldn't find the ports directory"
+        sys.exit(1)
+
+    # Repository
+    repodir = config.get('repository_'+options.repository, 'directory')
+    arches = config.get('repository_'+options.repository, 'arches').split(',')
+    if options.freshen is not None:
+        for arch in arches:
+            manage_repo(os.path.join(repodir, arch))
+        sys.exit(0)
+
+    # Run on the specified port or chain
+    try:
+        portname = args[0]
+        pkgname = args[0].split(os.path.sep)
+        if pkgname[0] == 'FEDORA':
+            # Package name is the rightmost element before branch name
+            pkgname = pkgname[-2]
+        else:
+            # In any other case this is the rightmost element
+            pkgname = pkgname[-1]
+
+        pkgpath = os.path.join(specfiles_dir, portname)
+        specfile = os.path.join(pkgpath, pkgname + '.spec')
+
+        if options.download is not None:
+            download_sources(pkgpath, specfile)
+
+        # Start
+        srcrpm = create_srpm(pkgpath, specfile, options.old_rpm)
+        if srcrpm is not None:
+            # First: move the generated SRPM to repository SRPM dir
+            # and regenerate metadata
+            srpm_dir = os.path.join(repodir, 'SRPM')
+            if not os.path.exists(srpm_dir):
+                os.makedirs(srpm_dir)
+            shutil.copy(srcrpm, os.path.join(repodir, 'SRPM'))
+            manage_repo(srpm_dir, srpm_dir=True)
+
+            # Then build the package
+            for arch in arches:
+                builder = 'builder_'+config.get('repository_'+options.repository, 'builder').replace('$arch', arch)
+
+                configdir = config.get(builder, 'directory')
+                profile = config.get(builder, 'profile')
+                destdir = os.path.join(repodir, arch)
+
+                if mock_build(configdir, destdir, profile, pkgname, srcrpm):
+                    manage_repo(destdir)
+                else:
+                    print 'BUILD FAILED!'
+                    sys.exit(1)
+    except IndexError:
+        pass
+
