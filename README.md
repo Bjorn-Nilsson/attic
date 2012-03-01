@@ -6,7 +6,7 @@ programming languages.
 
  * java-interpolated-properties: Extends `java.util.Properties` adding support
    for simple variable expansion.
- * jn: `make -j`jn``. 'Nuff said.
+ * jn: `make -j$(jn)`. 'Nuff said.
  * keyled: Displays CapsLock status in the systray.
  * nanogear: Simple RESTLet-like framework.
  * powershell-2: Post-configuration scripts for Windows 7.
