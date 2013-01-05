@@ -12,6 +12,7 @@ programming languages.
  * powershell-2: Post-configuration scripts for Windows 7.
  * rpmdevtools-extras: Additional utilities not part of `rpmdevtools`
    (Fedora, RHEL).
+ * sublime.el: Sublime Text 2 Emulation for Emacs >= 24.
  * yum-utils-extra: Additional utilities not part of `yum-utlis` (Fedora, RHEL).
 
 
