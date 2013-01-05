@@ -8,7 +8,7 @@ programming languages.
    for simple variable expansion.
  * jn: `make -j$(jn)`. 'Nuff said.
  * keyled: Displays CapsLock status in the systray.
- * nanogear: Simple RESTLet-like framework.
+ * nanogear: Simple RESTLet-like framework (C++, Qt).
  * powershell-2: Post-configuration scripts for Windows 7.
  * rpmdevtools-extras: Additional utilities not part of `rpmdevtools`
    (Fedora, RHEL).
